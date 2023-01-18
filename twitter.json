@@ -1,0 +1,155 @@
+POST& 
+https\%3A\%2F\%2Fapi.twitter.com\%2Foauth\%2Frequest_token&
+oauth_callback\%3Dhttp\%253A\%252F\%252Flocalhost\%252F
+process_callback\%26
+oauth_consumer_key\%3DGDdmIQH6jhtmLUypg82g\%26
+oauth_nonce\%3DQP70eNmVz8jvdPevU3oJD2AfF7R7odC2XJcn4XlZJqk\%26
+oauth_signature_method\%3DHMAC-SHA1\%26
+oauth_timestamp\%3D1272323042\%26
+oauth_version\%3D1.0
+OAuth
+oauth_nonce="QP70eNmVz8jvdPevU3oJD2AfF7R7odC2XJcn4XlZJqk",
+oauth_callback="http\%3A\%2F\%2Flocalhost\%2Fprocess_callback",
+oauth_signature_method="HMAC-SHA1",
+oauth_timestamp="1272323042",
+oauth_consumer_key="GDdmIQH6jhtmLUypg82g",
+oauth_signature="8wUi7m5HFQy76nowoCThusfgB\%2BQ\%3D",
+oauth_version="1.0"
+POST&
+https\%3A\%2F\%2Fapi.twitter.com\%2Foauth%2Faccess_token&
+oauth_consumer_key\%3DGDdmIQH6jhtmLUypg82g\%26
+oauth_nonce\%3D9zWH6qe0qG7Lc1telCn7FhUbLyVdjEaL3MO5uHxn8\%26
+oauth_signature_method\%3DHMAC-SHA1\%26
+oauth_timestamp\%3D1272323047\%26
+oauth_token\%3D8ldIZyxQeVrFZXFOZH5tAwj6vzJYuLQpl0WUEYtWc\%26
+oauth_verifier\%3DpDNg57prOHapMbhv25RNf75lVRd6JDsni1AJJIDYoTY\%26
+oauth_version\%3D1.0
+
+<?php
+// Incluindo função sendOAuthReq
+include 'sendOAuthReq.php';
+// Será usada a sessão para armazenar o token_secret
+session_start();
+// Valores dados pela API do Twitter apos registro em
+// http://twitter.com/oauth
+define('CONSUMER_KEY',
+       "[… COLOQUE AQUI SUA CONSUMER_KEY …]");
+define('CONSUMER_SECRET',
+       "[… COLOQUE AQUI SEU CONSUMER_SECRET …]");
+// Se tiver sido enviado o parâmetro oauth_token
+// tentar obter o token de acesso
+if($_GET['oauth_token']) {
+    // URL para requisição do token de acesso
+    $url = "https://twitter.com/oauth/access_token"; 
+  // Token de requisição e verificador serão enviados
+        $param['oauth_token'] = $_GET['oauth_token'];
+        $param['oauth_verifier'] = $_GET['oauth_verifier'];
+    // Faz requisição pelo token de acesso e trata resposta
+        $resposta =  sendOAuthReq($url, $param);
+      parse_str($resposta, $api);
+    // Token de acesso; 
+      echo $api['oauth_token'];   
+    // Destroi a sessão e encerra o script     
+      session_destroy(); 
+      die;
+    }
+// URL para obtenção do token de requisição
+    $url = "https://twitter.com/oauth/request_token";
+// Faz requisição passando a URL de retorno desejada
+    $param['oauth_callback'] = "http://localhost/process_callback";
+    $resposta = sendOAuthReq($url, $param);
+    parse_str($resposta, $api);
+// Armazena o token secret na sessão
+    $_SESSION['secret'] = $api['oauth_token_secret'];
+// Cria link para autorização, com o token de requisição
+    ?>
+    <a href="https://twitter.com/oauth/authenticate?
+         oauth_token=<?php echo $api['oauth_token']?>">
+    Autorizar no Twitter
+    </a>
+    <?php
+function sendOAuthReq($url, $param, $post = false) {
+    //Parâmetros comuns nas requisições
+    $param['oauth_consumer_key'] = CONSUMER_KEY;
+    $param['oauth_version'] = "1.0";
+    $param['oauth_timestamp'] = time();
+    $param['oauth_signature_method'] = "HMAC-SHA1";
+    $param['oauth_nonce'] = md5(uniqid(rand(), true));
+ // Ordenar parâmetros
+    ksort($param);
+    // Monta a chave e codifica com HMAC_SHA1
+    $sign = 'POST&'.
+            rawurlencode($url)."&". 
+            rawurlencode(http_build_query($param).
+            // Caso tenha parâmetros a ser enviados
+            // por POST, concatena-os.
+            (($post) ? "&".http_build_query($post) : ""));
+      $sign = base64_encode(
+                hash_hmac('sha1', $sign, 
+                CONSUMER_SECRET."&".$_SESSION['secret'], 
+                true
+              )
+      );
+      $param['oauth_signature'] = $sign;
+    // Monta cabeçalho Authorization com os parâmetros
+        $authHeader = "Authorization: OAuth ".
+                      http_build_query($param, null, ",");
+    // Requisita a URL, enviando os parâmetros com cURL
+      $curlHandle = curl_init(); 
+      curl_setopt($curlHandle, CURLOPT_URL, $url); 
+      curl_setopt($curlHandle, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($curlHandle, CURLOPT_HTTPHEADER, array($authHeader)); 
+      curl_setopt($curlHandle, CURLOPT_POST, true); 
+      if($post) { 
+          curl_setopt($curlHandle, CURLOPT_POSTFIELDS, http_build_query($post)); 
+      } 
+      $apiResponse = curl_exec($curlHandle); 
+      curl_close($curlHandle); 
+      return $apiResponse;
+    } ?>
+    <?php
+    include 'sendOAuthReq.php';
+    // Valores dados pela API do Twitter apos registro em
+    // http://twitter.com/oauth
+    define('CONSUMER_KEY',
+           "[… COLOQUE AQUI SUA CONSUMER_KEY …]");
+    define('CONSUMER_SECRET',
+           "[… COLOQUE AQUI SEU CONSUMER_SECRET …]");
+    
+     // Definindo token de acesso e chave secreta
+    define('ACCESS_TOKEN', $_GET['oauth_token']);
+    define('ACCESS_TOKEN_SECRET',
+           $_GET['oauth_token_secret']);
+    $_SESSION['secret'] = ACCESS_TOKEN_SECRET;
+     
+    // Método a ser requisitado
+    $url = "http://api.twitter.com/1/statuses/update.json";
+    $param['oauth_token'] = ACCESS_TOKEN;
+     
+    // Inclusão de novo post na timeline
+    $post['status'] = utf8_encode("Novo post no Twitter.");
+    $retorno = sendOAuthReq($url, $param, $post);
+     
+    // Recebe retorno em JSON e coloca-o
+    // em objeto JavaScript
+    ?>
+    <script>
+        retorno = <?php echo $retorno; ?>;
+    </script>
+  
+
+oauth_token_secret
+
+curl --request POST \{
+
+  --url 'https://api.twitter.com/1.1/statuses/update.json?status=Hello%20world' \
+
+  --header 'authorization: OAuth oauth_consumer_key="CONSUMER_API_KEY", oauth_nonce="OAUTH_NONCE", oauth_signature="OAUTH_SIGNATURE", oauth_signature_method="HMAC-SHA1", oauth_timestamp="OAUTH_TIMESTAMP", oauth_token="ACCESS_TOKEN", oauth_version="1.0"' \
+
+curl "https://api.twitter.com/2/tweets?ids=1261326399320715264,1278347468690915330" \
+  -H "Authorization: Bearer AAAAAAAAAAAAAAAAAAAAAFnz2wAAAAAAxTmQbp%2BIHDtAhTBbyNJon%2BA72K4%3DeIaigY0QBrv6Rp8KZQQLOTpo9ubw5Jt?WRE8avbi"};
+
+  curl -v --compressed -u<email_address>:<password>
+    "https://gnip-api.twitter.com/search/30day/accounts/<account-name>/prod/counts.json?query=from%3Atwitterdev"
+    "https://api.twitter.com/oauth/authenticate?oauth_token=Z6eEdO8MOmk394WozF5oKyuAv855l4Mlqo7hxxxxxx"
+
